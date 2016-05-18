@@ -99,17 +99,17 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> "=" { return new Symbol(TokenConstants.EQ); }
 
-<YYINITIAL> "(" ( return new Symbol(TokenConstants.LPAREN); )
+<YYINITIAL> "(" { return new Symbol(TokenConstants.LPAREN); }
 
-<YYINITIAL> ")" ( return new Symbol(TokenConstants.RPAREN); ) 
+<YYINITIAL> ")" { return new Symbol(TokenConstants.RPAREN); } 
 
-<YYINITIAL> "{" ( return new Symbol(TokenConstants.LBRACE); )
+<YYINITIAL> "{" { return new Symbol(TokenConstants.LBRACE); }
 
-<YYINITIAL> "}" ( return new Symbol(TokenConstants.RBRACE); )
+<YYINITIAL> "}" { return new Symbol(TokenConstants.RBRACE); }
 
-<YYINITIAL> "," (return new Symbol(TokenConstants.COMMA); )
+<YYINITIAL> "," {return new Symbol(TokenConstants.COMMA); }
 
-<YYINITIAL> "." (return new Symbol(TokenConstants.DOT); )
+<YYINITIAL> "." {return new Symbol(TokenConstants.DOT); }
 
 <YYINITIAL> [t][Rr][Uu][Ee] {return new Symbol(TokenConstants.BOOL_CONST, new Boolean(true));} 
 
@@ -117,17 +117,17 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> [Cc][Ll][Aa][Ss][Ss] {return new Symbol(TokenConstants.CLASS);}
 
-<YYINITIAL> [Ee][Ll][Ss]{Ee} {return new Symbol(TokenConstants.ELSE);}
+<YYINITIAL> [Ee][Ll][Ss][Ee] {return new Symbol(TokenConstants.ELSE);}
 
-<YYINITIAL> [Ff]Ii] {return new Symbol(TokenConstants.FI);}
+<YYINITIAL> [Ff][Ii] {return new Symbol(TokenConstants.FI);}
 
 <YYINITIAL> [Ii][Ff] {return new Symbol(TokenConstants.IF);}
 
 <YYINITIAL> [Ii][Nn] {return new Symbol(TokenConstants.IN);}
 
-<YYINITIAL> [Ii][Nn][Hh][Ee][Rr][Ii][Tt][Ss] {return new Symbol{TokenConstants.INHERITS};}
+<YYINITIAL> [Ii][Nn][Hh][Ee][Rr][Ii][Tt][Ss] {return new Symbol(TokenConstants.INHERITS);}
 
-<YYINITIAL> [Ii][Ss][Vv][Oo][Ii][Dd] {return new Symbol{TokenConstants.ISVOID};}
+<YYINITIAL> [Ii][Ss][Vv][Oo][Ii][Dd] {return new Symbol(TokenConstants.ISVOID);}
 
 <YYINITIAL> [Ll][Ee][Tt] {return new Symbol(TokenConstants.LET);}
 
@@ -135,15 +135,15 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> [Pp][Oo][Oo][Ll] {return new Symbol(TokenConstants.POOL);}
 
-<YYINITIAL> [Tt]{Hh}[Ee][Nn] {return new Symbol(TokenConstants.THEN);}
+<YYINITIAL> [Tt][Hh][Ee][Nn] {return new Symbol(TokenConstants.THEN);}
 
-<YYINITIAL> [Ww][Hh]Ii][Ll][Ee] {return new Symbol(TokenConstants.WHILE);}
+<YYINITIAL> [Ww][Hh][Ii][Ll][Ee] {return new Symbol(TokenConstants.WHILE);}
 
 <YYINITIAL> [Cc][Aa][Ss][Ee] {return new Symbol(TokenConstants.CASE);}
 
-<YYINITIAL> [Ee][Ss]Aa][Cc] {return new Symbol(TokenConstants.ESAC);}
+<YYINITIAL> [Ee][Ss][Aa][Cc] {return new Symbol(TokenConstants.ESAC);}
 
-<YYINITIAL> [Nn]Ee][Ww] {return new Symbol(TokenConstants.NEW);}
+<YYINITIAL> [Nn][Ee][Ww] {return new Symbol(TokenConstants.NEW);}
 
 <YYINITIAL> [Oo][Ff] {return new Symbol(TokenConstants.OF);}
 
@@ -157,7 +157,6 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> [a-z][0-9a-zA-z_]* {return new Symbol(TokenConstants.OBJECTID, AbstractTable.idtable.addString(yytext()));}
 
-<YYINITIAL>
 . { /* This rule should be the very last
        in your lexical specification and
        will match match everything not
