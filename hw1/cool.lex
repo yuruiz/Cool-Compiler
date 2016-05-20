@@ -19,8 +19,6 @@ import java_cup.runtime.Symbol;
     // For assembling string constants
     StringBuffer string_buf = new StringBuffer();
 	
-	int nestedCommentCount = 0;
-
     private int curr_lineno = 1;
     int get_curr_lineno() {
 	return curr_lineno;
@@ -181,21 +179,13 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> "*)" { return new Symbol(TokenConstants.ERROR, "Mismatched '*)'"); }
 
-<COMMENT> "(*" {nestedCommentCount++;}
-
-<COMMENT> "*)" {
-	if(nestedCommentCount == 0){
-		yybegin(YYINITIAL);
-	} else {
-		nestedCommentCount--;
-	}
-}
+<COMMENT> "*)" {yybegin(YYINITIAL);}
 
 <COMMENT> \n { 
 	curr_lineno++;
 }
 
-<COMMENT> [^*\n\(\)]+  { /* Do Nothing */ }
+<COMMENT> [^*\n("*)")]+  { /* Do Nothing */ }
 
 <YYINITIAL> \" {
 	string_buf.delete(0, string_buf.length());
@@ -265,6 +255,7 @@ import java_cup.runtime.Symbol;
 			string_buf.setCharAt(length-1, '\t');
 			break;
 		case 'n':
+		case '\n':
 			string_buf.setCharAt(length-1, '\n');
 			break;
 		case 'f':
