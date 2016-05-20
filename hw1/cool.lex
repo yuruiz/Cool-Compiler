@@ -18,7 +18,11 @@ import java_cup.runtime.Symbol;
 
     // For assembling string constants
     StringBuffer string_buf = new StringBuffer();
+
+	int nestedCommentCount = 0;
 	
+	boolean isEscaped = false;
+
     private int curr_lineno = 1;
     int get_curr_lineno() {
 	return curr_lineno;
@@ -127,7 +131,7 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> [t][Rr][Uu][Ee] {return new Symbol(TokenConstants.BOOL_CONST, new Boolean(true));} 
 
-<YYINITIAL> [f][Aa][Ll]Ss[Ee] {return new Symbol(TokenConstants.BOOL_CONST, new Boolean(false));}
+<YYINITIAL> [f][Aa][Ll][Ss][Ee] {return new Symbol(TokenConstants.BOOL_CONST, new Boolean(false));}
 
 <YYINITIAL> [Cc][Ll][Aa][Ss][Ss] {return new Symbol(TokenConstants.CLASS);}
 
@@ -165,7 +169,7 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> \n { curr_lineno++; }
 
-<YYINITIAL> [ \32\t\f\r\t\v]+ {/* Get rid of white space */}
+<YYINITIAL> [\040\f\r\t\013]+ {/* Get rid of white space */}
 
 <YYINITIAL> [0-9]+ {return new Symbol(TokenConstants.INT_CONST, AbstractTable.inttable.addString(yytext())); }
 
@@ -179,13 +183,28 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> "*)" { return new Symbol(TokenConstants.ERROR, "Mismatched '*)'"); }
 
-<COMMENT> "*)" {yybegin(YYINITIAL);}
+<COMMENT> "*)" {
+	if (nestedCommentCount != 0) {
+		nestedCommentCount--;	
+	} else {
+		yybegin(YYINITIAL);	
+	}
+}
+
+
+<COMMENT> "(*" { nestedCommentCount++; }
 
 <COMMENT> \n { 
 	curr_lineno++;
 }
 
-<COMMENT> [^*\n("*)")]+  { /* Do Nothing */ }
+<COMMENT> [^*\n\)\(]+  { /* Do Nothing */ }
+
+<COMMENT> "(" {}
+
+<COMMENT> "*" {}
+
+<COMMENT> ")" {}
 
 <YYINITIAL> \" {
 	string_buf.delete(0, string_buf.length());
@@ -214,15 +233,28 @@ import java_cup.runtime.Symbol;
 }
 
 <STRING_NULLINSTRING> \n {
-	yybegin(YYINITIAL);
 	curr_lineno++;
-	return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant"); 
+
+	if (isEscaped){
+		isEscaped = false;	
+	}
+	else {
+		yybegin(YYINITIAL);
+		return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant by null string"); 
+	}
 }
 
 <STRING_STRINGTOOLONG> \n {
-	yybegin(YYINITIAL);
 	curr_lineno++;
-	return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant"); 
+
+	if (isEscaped){
+		isEscaped = false;	
+	}
+	else {
+		yybegin(YYINITIAL);
+		return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant by too long"); 
+	}
+
 }
 
 
@@ -232,20 +264,31 @@ import java_cup.runtime.Symbol;
 	} else {
 		if (yytext().charAt(0) == '\\'){
 			yybegin(STRING_BACKSLASHESCAPED);
+			isEscaped = true;
 		}
 		string_buf.append(yytext());
 		
-		if (string_buf.length() > MAX_STR_CONST) {
+		if (string_buf.length() >= MAX_STR_CONST) {
 				yybegin(STRING_STRINGTOOLONG);
 		}
 	}
 }
 
-<STRING_NULLINSTRING> [^\n\"] { /* do nothing*/ }
+<STRING_NULLINSTRING> [^\n\"] { 
+	if (yytext().charAt(0) == '\\')
+	{
+		isEscaped = true;
+	}	
+}
 
-<STRING_STRINGTOOLONG> [^\n\"] { /* do nothing */}
+<STRING_STRINGTOOLONG> [^\n\"] { 
+	if (yytext().charAt(0) == '\\'){
+		isEscaped = true;
+	}
+}
 
-<STRING_BACKSLASHESCAPED> [^\"] {
+
+<STRING_BACKSLASHESCAPED> . {
 	int length = string_buf.length();
 	switch(yytext().charAt(0)) {
 		case 'b':
@@ -255,7 +298,6 @@ import java_cup.runtime.Symbol;
 			string_buf.setCharAt(length-1, '\t');
 			break;
 		case 'n':
-		case '\n':
 			string_buf.setCharAt(length-1, '\n');
 			break;
 		case 'f':
@@ -264,8 +306,35 @@ import java_cup.runtime.Symbol;
 		default:
 			string_buf.setCharAt(length-1, yytext().charAt(0));
 	}			
-	yybegin(STRING);
+	
+	if (yytext().charAt(0) ==  '\0')
+	{
+		yybegin(STRING_NULLINSTRING);
+	}
+	else if (string_buf.length() >= MAX_STR_CONST) 
+	{
+		yybegin(STRING_STRINGTOOLONG);
+	} 
+	else 
+	{
+		yybegin(STRING);
+	}
 }
+
+<STRING_BACKSLASHESCAPED> \n { 
+	curr_lineno++;
+	string_buf.setCharAt(string_buf.length()-1, yytext().charAt(0)); 
+
+	if (string_buf.length() >= MAX_STR_CONST) {
+		yybegin(STRING_STRINGTOOLONG);
+	} else {
+		yybegin(STRING);
+	}
+
+}
+	
+<YYINITIAL> . { return new Symbol(TokenConstants.ERROR, new String(yytext())); }
+
 
 . { /* This rule should be the very last
        in your lexical specification and
