@@ -18,6 +18,8 @@ import java_cup.runtime.Symbol;
 
     // For assembling string constants
     StringBuffer string_buf = new StringBuffer();
+	
+	int nestedCommentCount = 0;
 
     private int curr_lineno = 1;
     int get_curr_lineno() {
@@ -55,13 +57,23 @@ import java_cup.runtime.Symbol;
 
     switch(yy_lexical_state) {
     case YYINITIAL:
-	/* nothing special to do in the initial state */
-	break;
-	/* If necessary, add code for other states here, e.g:
-	   case COMMENT:
-	   ...
-	   break;
-	*/
+		/* nothing special to do in the initial state */
+		break;
+		/* If necessary, add code for other states here, e.g:
+		   case COMMENT:
+		   ...
+		   break;
+		*/
+	case COMMENT:
+		yybegin(EOF_ENCOUNTERED);
+		return new Symbol(TokenConstants.ERROR, "Error: EOF in comment");
+	case STRING:
+		yybegin(EOF_ENCOUNTERED);
+		return new Symbol(TokenConstants.ERROR, "Error: EOF in string constant");
+	case EOF_ENCOUNTERED:
+		break;
+	default:
+		break;
     }
     return new Symbol(TokenConstants.EOF);
 %eofval}
@@ -71,6 +83,10 @@ import java_cup.runtime.Symbol;
 
 %state STRING
 %state COMMENT
+%state STRING_BACKSLASHESCAPED
+%state STRING_NULLINSTRING
+%state STRING_STRINGTOOLONG
+%state EOF_ENCOUNTERED
 %%
 
 <YYINITIAL>"=>"	{ return new Symbol(TokenConstants.DARROW); }
@@ -149,13 +165,116 @@ import java_cup.runtime.Symbol;
 
 <YYINITIAL> [Nn][Oo][Tt] {return new Symbol(TokenConstants.NOT);}
 
-<YYINITIAL> [\32\n\t\f\r\t\v]+ {/* Get rid of white space */}
+<YYINITIAL> \n { curr_lineno++; }
+
+<YYINITIAL> [ \32\t\f\r\t\v]+ {/* Get rid of white space */}
 
 <YYINITIAL> [0-9]+ {return new Symbol(TokenConstants.INT_CONST, AbstractTable.inttable.addString(yytext())); }
 
 <YYINITIAL> [A-Z][0-9a-zA-z_]* {return new Symbol(TokenConstants.TYPEID, AbstractTable.idtable.addString(yytext()));}
 
 <YYINITIAL> [a-z][0-9a-zA-z_]* {return new Symbol(TokenConstants.OBJECTID, AbstractTable.idtable.addString(yytext()));}
+
+<YYINITIAL> "--".* {/* ignore the comment line */}
+
+<YYINITIAL> "(*" {yybegin(COMMENT);}
+
+<YYINITIAL> "*)" { return new Symbol(TokenConstants.ERROR, "Mismatched '*)'"); }
+
+<COMMENT> "(*" {nestedCommentCount++;}
+
+<COMMENT> "*)" {
+	if(nestedCommentCount == 0){
+		yybegin(YYINITIAL);
+	} else {
+		nestedCommentCount--;
+	}
+}
+
+<COMMENT> \n { 
+	curr_lineno++;
+}
+
+<COMMENT> [^*\n\(\)]+  { /* Do Nothing */ }
+
+<YYINITIAL> \" {
+	string_buf.delete(0, string_buf.length());
+	yybegin(STRING);
+}
+
+<STRING> \" {
+	yybegin(YYINITIAL);
+	return new Symbol(TokenConstants.STR_CONST, AbstractTable.stringtable.addString((string_buf.toString())));
+} 
+
+<STRING_STRINGTOOLONG> \" {
+	yybegin(YYINITIAL);
+	return new Symbol(TokenConstants.ERROR, "Error: String constant too long");
+}
+
+<STRING_NULLINSTRING> \" {
+	yybegin(YYINITIAL);
+	return new Symbol(TokenConstants.ERROR, "Error: String contains null character");
+}
+
+<STRING> \n {
+	yybegin(YYINITIAL);
+	curr_lineno++;
+	return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant"); 
+}
+
+<STRING_NULLINSTRING> \n {
+	yybegin(YYINITIAL);
+	curr_lineno++;
+	return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant"); 
+}
+
+<STRING_STRINGTOOLONG> \n {
+	yybegin(YYINITIAL);
+	curr_lineno++;
+	return new Symbol(TokenConstants.ERROR, "Error: Unterminated string constant"); 
+}
+
+
+<STRING> [^\n\"] {
+	if (yytext().charAt(0) == '\0'){
+		yybegin(STRING_NULLINSTRING);
+	} else {
+		if (yytext().charAt(0) == '\\'){
+			yybegin(STRING_BACKSLASHESCAPED);
+		}
+		string_buf.append(yytext());
+		
+		if (string_buf.length() > MAX_STR_CONST) {
+				yybegin(STRING_STRINGTOOLONG);
+		}
+	}
+}
+
+<STRING_NULLINSTRING> [^\n\"] { /* do nothing*/ }
+
+<STRING_STRINGTOOLONG> [^\n\"] { /* do nothing */}
+
+<STRING_BACKSLASHESCAPED> [^\"] {
+	int length = string_buf.length();
+	switch(yytext().charAt(0)) {
+		case 'b':
+			string_buf.setCharAt(length-1, '\b');
+			break;
+		case 't':
+			string_buf.setCharAt(length-1, '\t');
+			break;
+		case 'n':
+			string_buf.setCharAt(length-1, '\n');
+			break;
+		case 'f':
+			string_buf.setCharAt(length-1, '\f');
+			break;
+		default:
+			string_buf.setCharAt(length-1, yytext().charAt(0));
+	}			
+	yybegin(STRING);
+}
 
 . { /* This rule should be the very last
        in your lexical specification and
