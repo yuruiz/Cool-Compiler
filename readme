@@ -1,0 +1,35 @@
+Steps:
+Install packages (If you only intend to use the C++ version, you don't need the jdk).
+For Ubuntu:
+sudo apt-get install flex bison build-essential csh openjdk-6-jdk libxaw7-dev libc6-i386
+For Fedora:
+sudo yum groupinstall "Development Tools" "Development Libraries"
+sudo yum install bison flex csh
+Make the /usr/class directory:
+sudo mkdir /usr/class
+Make the directory owned by you:
+sudo chown $USER /usr/class
+Go to /usr/class and download the tarball:
+cd /usr/class
+wget http://spark-university.s3.amazonaws.com/stanford-compilers/vm/student-dist.tar.gz
+Untar:
+tar -xf student-dist.tar.gz
+If you want things exactly like the VMs:
+Add a symlink to your home directory:
+ln -s /usr/class/cs143/cool ~/cool
+Add the bin directory to your $PATH environment variable. If you are using bash, add to your .profile (or .bash_profile, .bashrc etc. depending on your configuration; note that in Ubuntu have to log out and back in for this to take effect):
+PATH=/usr/class/cs143/cool/bin:$PATH
+You may want to prepend export to the above command, i.e. export PATH=....
+
+************note*******************
+spim" is 32-bit program, in 64-bit system it requires installing 32-bit "glibc" library. 
+Because of heavy patching in order to run COOL assembly code (*.s) you have to use provided "spim" program, not any newer version available on the internet.
+If xspim (the GUI version of spim) does not start up but only prints something like 
+*-courier-medium-r-normal--12-*-75-*
+on the console, you will need to install some missing fonts and add them to the font path of your X11, like so:
+sudo apt-get install xfonts-75dpi xfonts-100dpi
+xset +fp /usr/share/fonts/X11/75dpi
+***********************************
+
+In Debian/ubuntu, the 32 bit glibc library is provided by the libc6-i386 package:
+sudo apt-get install libc6-i386"
