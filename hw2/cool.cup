@@ -68,6 +68,11 @@ nonterminal programc program;
 nonterminal Classes class_list;
 nonterminal class_c class;
 nonterminal Features dummy_feature_list;
+nonterminal Feature feature
+nonterminal Formals formals
+nonterminal Formal formal
+nonterminal Expressions expressions expressions_comma expressions_semi
+nonterminal Expression expression
 
 /* Precedence declarations go here. */
 
@@ -99,4 +104,143 @@ class
 dummy_feature_list
 	::= /* empty */
 	    {: RESULT = new Features(curr_lineno()); :}
+	| feature:f
+		{: RESULT = (new Features(curr_lineno())).appendElement(f); :}
+	| dummy_feature_list:fs SEMI feature:f
+		{: RESULT = fs.appendElement(f); :}
 	;
+feature
+	::= OBJECTID:oId LPAREN formals:fs RPAREN COLON TYPEID:tId LBRACE expressions:exps RBRACE
+		{: RESULT = new method(curr_lineno(), oId, fs, tId, exps); :}
+	| OBJECTID:oId COLON TYPEID:tId  
+		{: RESULT = new attr(curr_lineno(), oId, tId, new no_expr()); :}
+	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:exp
+		{: RESULT = new attr(curr_lineno(), oId, tId, exp); :}
+
+formals
+	::= /* empty */
+		{: RESULT = new Formals(curr_lineno()); :}
+	| formal:f
+		{: RESULT = (new Formals(curr_lineno()).appendElement(f); :}
+	| formals:fs COMMA formal:f
+		{: RESULT = fs.appendElement(f); :}
+
+formal 
+	::= OBJECTID:oId COLON TYPEID:tId
+		{: RESULT = new formal(oId, tId); :}
+
+expressions
+	::= expression:exp
+		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
+	| expressions:exps expression:exp
+		{: RESULT = exps.appendElement(exp); :}
+
+expressions_comma
+	::= /* empty */
+		{: RESULT = new Expressions(curr_lineno()); :}
+	| expression:exp
+		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
+	| expressions:exps COMMA expression:exp
+		{: RESULT = exps.appendElement(exp); :}
+
+expressions_semi
+	::= expression:exp
+		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
+	| expressions:exps SEMI expression:exp
+		{: RESULT = exps.appendElement(exp); :}
+
+expression
+	::= 
+	// Assignment
+	OBJECTID:oId ASSIGN expression:exp
+		{: RESULT = new assign(curr_lineno(), oId, exp); :}
+
+	// Dispatch
+	| expression:exp DOT OBJECTID:oId LPAREN expressions_comma:exps RPAREN
+		{: RESULT = new dispatch(exp, oId, exps); :} 
+	| expression:exp AT TYPEID:tId DOT OBJECTID:oId LPAREN expressions_comma:exps RPAREN
+		{: RESULT = new static_dispatch(exp, tId, oId, exps); :}
+	| OBJECTID:oId LPAREN expressions_comma RPAREN
+		{: RESULT = new dispatch(new no_expr(), oId, exps); :}
+
+	// Condition
+	| IF expression:exp1 THEN expression:exp2 ELSE expression:exp3 FI
+		{: RESULT = new cond(curr_lineno(), exp1, exp2, exp3); :}
+
+	// Loop
+	| WHILE expression:exp1 LOOP exp2 POOL
+		{: RESULT = new loop(curr_lineno(), exp1, exp2); :}
+
+	// Block
+	| LBRACE expression_semi:exps RBRACE
+		{: RESULT = new block(curr_lineno(), exps); :}
+
+	// Let
+	| LET 
+
+	// Case
+	| case
+
+	// new
+	| NEW TYPEID:tId
+		{: RPAREN = new new_(curr_lineno(), tId); :}
+
+	// IsVoid
+	| ISVOID expression:exp
+		{: RESULT = new ISVOID(curr_lineno(), exp); :}
+
+	// Plus
+	| expression:exp1 PLUS expression:exp2
+		{: RESULT = new plus(curr_lineno(), exp1, exp2); :}
+
+	// Minus
+	| expression:exp1 MINUS expression:exp2
+		{: RESULT = new sub(curr_lineno(), exp1, exp2); :}
+
+	// Multiply
+	| expression:exp1 MULT expression:exp2
+		{: RESULT = new mul(curr_lineno(), exp1, exp2); :}
+
+	// Divide
+	| expression:exp1 DIV expression:exp2
+		{: RESULT = new divide(curr_lineno(), exp1, exp2); :}
+
+	// Negative
+	| NEG expression:exp
+		{: RESULT = new neg(curr_lineno(), exp); :}
+
+	// Less
+	| expression:exp1 LT expression:exp2
+		{: RESULT = new lt(curr_lineno(), exp1, exp2); :}
+
+	// Less or Equal
+	| expression:exp1 LE expression:exp2
+		{: RESULT = new leq(curr_lineno(), exp1, exp2); :}
+
+	// Equal
+	| expression:exp1 EQ expression:exp2
+		{: RESULT = new eq(curr_lineno(), exp1, exp2); :}
+
+	// Not
+	| NOT expression:exp
+		{: RESULT = new comp(curr_lineno(), exp); :}
+
+	// List of Expressions
+	| LPAREN expression:exp RPAREN
+		{: RESULT = exp; :}
+
+	// Object ID
+	| OBJECTID:oId
+		{: RESULT = new object(curr_lineno(), oId); :}
+
+	// Integer 
+	| INT_CONST:int_con
+		{: RESULT = new int_const(curr_lineno(), int_con); :}
+
+	// String
+	| STR_CONST:str_con
+		{: RESULT = new string_const(curr_lineno(), str_con); :}
+
+	// bool
+	| BOOL_CONST:val
+		{: RESULT = new bool_const(curr_lineno(), val); :}
