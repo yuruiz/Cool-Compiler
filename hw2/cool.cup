@@ -68,13 +68,25 @@ nonterminal programc program;
 nonterminal Classes class_list;
 nonterminal class_c class;
 nonterminal Features dummy_feature_list;
-nonterminal Feature feature
-nonterminal Formals formals
-nonterminal Formal formal
-nonterminal Expressions expressions expressions_comma expressions_semi
-nonterminal Expression expression
+nonterminal Feature feature;
+nonterminal Formals formals;
+nonterminal Formal formal;
+nonterminal Expressions expressions, expressions_comma, expressions_semi;
+nonterminal Expression expression;
+nonterminal Cases case_list;
+nonterminal Case case_branch;
+nonterminal let letRemainder;
 
 /* Precedence declarations go here. */
+precedence right ASSIGN;
+precedence right NOT;
+precedence nonassoc LE, LT, EQ;
+precedence left MINUS, PLUS;
+precedence left MULT, DIV;
+precedence left ISVOID;
+precedence right NEG;
+precedence nonassoc AT;
+precedence left DOT;
 
 program	
 	::= class_list:cl
@@ -110,44 +122,66 @@ dummy_feature_list
 		{: RESULT = fs.appendElement(f); :}
 	;
 feature
-	::= OBJECTID:oId LPAREN formals:fs RPAREN COLON TYPEID:tId LBRACE expressions:exps RBRACE
-		{: RESULT = new method(curr_lineno(), oId, fs, tId, exps); :}
+	::= OBJECTID:oId LPAREN formals:fs RPAREN COLON TYPEID:tId LBRACE expression:exp RBRACE
+		{: RESULT = new method(curr_lineno(), oId, fs, tId, exp); :}
 	| OBJECTID:oId COLON TYPEID:tId  
-		{: RESULT = new attr(curr_lineno(), oId, tId, new no_expr()); :}
+		{: RESULT = new attr(curr_lineno(), oId, tId, new no_expr(curr_lineno())); :}
 	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:exp
 		{: RESULT = new attr(curr_lineno(), oId, tId, exp); :}
+	;
 
 formals
 	::= /* empty */
 		{: RESULT = new Formals(curr_lineno()); :}
 	| formal:f
-		{: RESULT = (new Formals(curr_lineno()).appendElement(f); :}
+		{: RESULT = (new Formals(curr_lineno()).appendElement(f)); :}
 	| formals:fs COMMA formal:f
 		{: RESULT = fs.appendElement(f); :}
+	;
 
 formal 
 	::= OBJECTID:oId COLON TYPEID:tId
-		{: RESULT = new formal(oId, tId); :}
+		{: RESULT = new formalc(curr_lineno(), oId, tId); :}
+	;
 
-expressions
-	::= expression:exp
-		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
-	| expressions:exps expression:exp
-		{: RESULT = exps.appendElement(exp); :}
+letRemainder
+	::= OBJECTID:oId COLON TYPEID:tId IN expression:exp
+		{: RESULT = new let(curr_lineno(), oId, tId, new no_expr(curr_lineno()), exp); :}
+	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:init IN expression:body
+		{: RESULT = new let(curr_lineno(), oId, tId, init, body); :}
+	| OBJECTID:oId COLON TYPEID:tId COMMA letRemainder:remain
+		{: RESULT = new let(curr_lineno(), oId, tId, new no_expr(curr_lineno()), remain); :}
+	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:init COMMA letRemainder:remain
+		{: RESULT = new let(curr_lineno(), oId, tId, init, remain); :}
+	;
+
+case_branch
+	::= OBJECTID:oId COLON TYPEID:tId DARROW expression:exp SEMI
+		{: RESULT = new branch(curr_lineno(), oId, tId, exp); :}
+	;
+
+case_list
+	::= case_branch:caseBranch
+		{: RESULT = (new Cases(curr_lineno())).appendElement(caseBranch); :}
+	| case_list:cases case_branch:caseBranch 
+		{: RESULT = cases.appendElement(caseBranch); :}
+	;
 
 expressions_comma
 	::= /* empty */
 		{: RESULT = new Expressions(curr_lineno()); :}
 	| expression:exp
 		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
-	| expressions:exps COMMA expression:exp
+	| expressions_comma:exps COMMA expression:exp
 		{: RESULT = exps.appendElement(exp); :}
+	;
 
 expressions_semi
-	::= expression:exp
+	::= expression:exp SEMI
 		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
-	| expressions:exps SEMI expression:exp
+	| expressions_semi:exps expression:exp SEMI
 		{: RESULT = exps.appendElement(exp); :}
+	;
 
 expression
 	::= 
@@ -157,37 +191,38 @@ expression
 
 	// Dispatch
 	| expression:exp DOT OBJECTID:oId LPAREN expressions_comma:exps RPAREN
-		{: RESULT = new dispatch(exp, oId, exps); :} 
+		{: RESULT = new dispatch(curr_lineno(), exp, oId, exps); :} 
 	| expression:exp AT TYPEID:tId DOT OBJECTID:oId LPAREN expressions_comma:exps RPAREN
-		{: RESULT = new static_dispatch(exp, tId, oId, exps); :}
-	| OBJECTID:oId LPAREN expressions_comma RPAREN
-		{: RESULT = new dispatch(new no_expr(), oId, exps); :}
+		{: RESULT = new static_dispatch(curr_lineno(), exp, tId, oId, exps); :}
+	| OBJECTID:oId LPAREN expressions_comma:exps RPAREN
+		{: RESULT = new dispatch(curr_lineno(), new no_expr(curr_lineno()), oId, exps); :}
 
 	// Condition
 	| IF expression:exp1 THEN expression:exp2 ELSE expression:exp3 FI
-		{: RESULT = new cond(curr_lineno(), exp1, exp2, exp3); :}
 
 	// Loop
-	| WHILE expression:exp1 LOOP exp2 POOL
+	| WHILE expression:exp1 LOOP expression:exp2 POOL
 		{: RESULT = new loop(curr_lineno(), exp1, exp2); :}
 
 	// Block
-	| LBRACE expression_semi:exps RBRACE
+	| LBRACE expressions_semi:exps RBRACE
 		{: RESULT = new block(curr_lineno(), exps); :}
 
 	// Let
-	| LET 
+	| LET letRemainder:letRemain
+		{: RESULT = letRemain; :} 
 
 	// Case
-	| case
+	| CASE expression:exp OF case_list:cases ESAC
+		{: RESULT = new typcase(curr_lineno(), exp, cases); :}
 
 	// new
 	| NEW TYPEID:tId
-		{: RPAREN = new new_(curr_lineno(), tId); :}
+		{: RESULT = new new_(curr_lineno(), tId); :}
 
 	// IsVoid
 	| ISVOID expression:exp
-		{: RESULT = new ISVOID(curr_lineno(), exp); :}
+		{: RESULT = new isvoid(curr_lineno(), exp); :}
 
 	// Plus
 	| expression:exp1 PLUS expression:exp2
@@ -221,7 +256,7 @@ expression
 	| expression:exp1 EQ expression:exp2
 		{: RESULT = new eq(curr_lineno(), exp1, exp2); :}
 
-	// Not
+	// Logical Not
 	| NOT expression:exp
 		{: RESULT = new comp(curr_lineno(), exp); :}
 
@@ -244,3 +279,4 @@ expression
 	// bool
 	| BOOL_CONST:val
 		{: RESULT = new bool_const(curr_lineno(), val); :}
+	;
