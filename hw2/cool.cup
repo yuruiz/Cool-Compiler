@@ -110,6 +110,9 @@ class
 				   f, curr_filename()); :}
 	| CLASS TYPEID:n INHERITS TYPEID:p LBRACE dummy_feature_list:f RBRACE SEMI
 	    {: RESULT = new class_c(curr_lineno(), n, p, f, curr_filename()); :}
+	| CLASS TYPEID error SEMI
+	| CLASS TYPEID INHERITS TYPEID error SEMI
+	| error
 	;
 
 /* Feature list may be empty, but no empty features in list. */
@@ -118,16 +121,17 @@ dummy_feature_list
 	    {: RESULT = new Features(curr_lineno()); :}
 	| feature:f
 		{: RESULT = (new Features(curr_lineno())).appendElement(f); :}
-	| dummy_feature_list:fs SEMI feature:f
+	| dummy_feature_list:fs feature:f
 		{: RESULT = fs.appendElement(f); :}
 	;
 feature
-	::= OBJECTID:oId LPAREN formals:fs RPAREN COLON TYPEID:tId LBRACE expression:exp RBRACE
+	::= OBJECTID:oId LPAREN formals:fs RPAREN COLON TYPEID:tId LBRACE expression:exp RBRACE SEMI
 		{: RESULT = new method(curr_lineno(), oId, fs, tId, exp); :}
-	| OBJECTID:oId COLON TYPEID:tId  
-		{: RESULT = new attr(curr_lineno(), oId, tId, new no_expr(curr_lineno())); :}
-	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:exp
+	| OBJECTID:oId COLON TYPEID:tId SEMI 
+		{: RESULT = new attr(curr_lineno(), oId, tId, new no_expr(curr_lineno())); :} 
+	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:exp SEMI
 		{: RESULT = new attr(curr_lineno(), oId, tId, exp); :}
+	| error SEMI
 	;
 
 formals
@@ -153,6 +157,7 @@ letRemainder
 		{: RESULT = new let(curr_lineno(), oId, tId, new no_expr(curr_lineno()), remain); :}
 	| OBJECTID:oId COLON TYPEID:tId ASSIGN expression:init COMMA letRemainder:remain
 		{: RESULT = new let(curr_lineno(), oId, tId, init, remain); :}
+	| error COMMA letRemainder
 	;
 
 case_branch
@@ -181,6 +186,8 @@ expressions_semi
 		{: RESULT = (new Expressions(curr_lineno())).appendElement(exp); :}
 	| expressions_semi:exps expression:exp SEMI
 		{: RESULT = exps.appendElement(exp); :}
+	| error SEMI
+	| error SEMI expressions_semi
 	;
 
 expression
@@ -195,10 +202,11 @@ expression
 	| expression:exp AT TYPEID:tId DOT OBJECTID:oId LPAREN expressions_comma:exps RPAREN
 		{: RESULT = new static_dispatch(curr_lineno(), exp, tId, oId, exps); :}
 	| OBJECTID:oId LPAREN expressions_comma:exps RPAREN
-		{: RESULT = new dispatch(curr_lineno(), new no_expr(curr_lineno()), oId, exps); :}
+		{: RESULT = new dispatch(curr_lineno(), new object(curr_lineno(), AbstractTable.idtable.addString("self")), oId, exps); :}
 
 	// Condition
-	| IF expression:exp1 THEN expression:exp2 ELSE expression:exp3 FI
+	| IF expression:pred THEN expression:then_exp ELSE expression:else_exp FI
+		{: RESULT = new cond(curr_lineno(), pred, then_exp, else_exp); :}
 
 	// Loop
 	| WHILE expression:exp1 LOOP expression:exp2 POOL
@@ -207,6 +215,7 @@ expression
 	// Block
 	| LBRACE expressions_semi:exps RBRACE
 		{: RESULT = new block(curr_lineno(), exps); :}
+
 
 	// Let
 	| LET letRemainder:letRemain
